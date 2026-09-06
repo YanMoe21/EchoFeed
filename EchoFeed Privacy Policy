@@ -1,6 +1,6 @@
 Privacy Policy
 
-This Privacy Policy describes how [Your App Name] ("we", "us", or "our") handles your information when you use our mobile application.
+This Privacy Policy describes how EchoFeed ("we", "us", or "our") handles your information when you use our mobile application.
 
 1. Information Collection and Use
 Our application is designed to function primarily offline. We do not require you to create an account, nor do we directly collect or store any personally identifiable information (such as your name, email, or phone number).
