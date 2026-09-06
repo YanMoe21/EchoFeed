@@ -7,7 +7,6 @@ Our application is designed to function primarily offline. We do not require you
 
 2. Permissions Requested
 To provide specific features, the App requests the following permissions on your device:
-
 * Storage Permission: Used solely to allow the app to store, read, or save necessary files locally on your device for offline functionality. We do not access or collect your private photos, videos, or personal files.
 * Notification Permission: Used to send you push notifications, updates, or helpful information regarding the app. You can disable notifications at any time through your device settings.
 
