@@ -28,4 +28,4 @@ Our App does not knowingly collect personal identifiable information from childr
 We may update our Privacy Policy from time to time. You are advised to review this page periodically for any changes.
 
 7. Contact Us
-If you have any questions or suggestions about our Privacy Policy, do not hesitate to contact us at [Your Email Address].
+If you have any questions or suggestions about our Privacy Policy, do not hesitate to contact us at echofeed2026@gmail.com.
