@@ -1,0 +1,1707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>EchoFeed</title>
+    <style>
+        :root {
+            --bg-color: #f0f2f5;
+            --card-bg: #ffffff;
+            --text-main: #1c1e21;
+            --text-sub: #65676b;
+            --primary: #1877f2;
+            --border: #e4e6eb;
+            --base-font-size: 15px; /* Changeable via Settings */
+        }
+
+        body.dark-mode {
+            --bg-color: #18191a;
+            --card-bg: #242526;
+            --text-main: #e4e6eb;
+            --text-sub: #b0b3b8;
+            --primary: #2d88ff;
+            --border: #3e4042;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-main); font-size: var(--base-font-size); transition: 0.3s; }
+        
+        /* Setup / Login Screen */
+        .setup-screen { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; padding: 20px; }
+        .setup-card { background: var(--card-bg); padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 350px; text-align: center; }
+        .setup-card h1 { color: var(--primary); margin-bottom: 20px; }
+        .input-box { width: 100%; padding: 12px; margin-bottom: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-color); color: var(--text-main); outline: none; font-size: 0.95em; }
+        .btn-primary { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn-primary:disabled { opacity: 0.7; cursor: not-allowed; }
+        
+        /* App Layout */
+        .app-container { display: none; flex-direction: column; height: 100vh; max-width: 500px; margin: 0 auto; background: var(--bg-color); position: relative; overflow: hidden; }
+        .header { background: var(--card-bg); padding: 12px 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10;}
+        .header h2 { color: var(--primary); font-size: 1.3em; }
+        .header-icons { font-size: 20px; cursor: pointer; display: flex; gap: 15px;}
+        
+        /* Offline Indicator Bar */
+        .offline-banner { display: none; background: #ff9800; color: white; text-align: center; padding: 6px; font-size: 0.8em; font-weight: bold; }
+
+        /* Search Bar UI */
+        .search-container { display: none; background: var(--card-bg); padding: 12px 15px; border-bottom: 1px solid var(--border); animation: slideDown 0.2s ease-out; }
+        @keyframes slideDown { from { transform: translateY(-10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .search-filters { display: flex; gap: 8px; margin-top: 5px; }
+        
+        /* Custom Filter Buttons */
+        .search-select-btn { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-color); color: var(--text-main); font-size: 0.85em; outline: none; cursor: pointer; text-align: left; position: relative; }
+        .search-select-btn::after { content: '▼'; position: absolute; right: 10px; font-size: 0.8em; color: var(--text-sub); }
+
+        /* Pull-to-Refresh Indicator */
+        .pull-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 0;
+            overflow: hidden;
+            transition: height 0.2s ease;
+            font-size: 0.85em;
+            color: var(--primary);
+            font-weight: bold;
+            background: var(--bg-color);
+        }
+
+        .feed { flex: 1; overflow-y: auto; padding: 10px; padding-bottom: 70px; -webkit-overflow-scrolling: touch; }
+        
+        /* Post Card */
+        .post-card { background: var(--card-bg); border-radius: 10px; margin-bottom: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 15px; }
+        .post-header { display: flex; justify-content: space-between; margin-bottom: 10px; }
+        .post-author-box { display: flex; align-items: center; gap: 8px; }
+        .post-author { font-weight: bold; color: var(--primary); }
+        .category-badge { font-size: 0.75em; padding: 2px 8px; border-radius: 12px; background: rgba(24, 119, 242, 0.1); color: var(--primary); font-weight: 600; }
+        .post-time { font-size: 0.8em; color: var(--text-sub); margin-top: 2px; }
+        .post-text { margin-bottom: 10px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+        
+        /* Image Grid for Multiple Images */
+        .post-img { width: 100%; border-radius: 8px; margin-bottom: 10px; cursor: pointer; }
+        .post-img-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 6px; margin-bottom: 10px; }
+        .post-grid-img { width: 100%; height: 140px; object-fit: cover; border-radius: 6px; cursor: pointer; transition: 0.2s; }
+        .post-grid-img:active { opacity: 0.8; }
+
+        .post-actions { display: flex; border-top: 1px solid var(--border); padding-top: 10px; gap: 20px; }
+        .action-btn { background: none; border: none; color: var(--text-sub); font-size: 1em; cursor: pointer; display: flex; align-items: center; gap: 5px; }
+        .action-btn.liked { color: #e0245e; }
+        
+        /* Auto Link Styling */
+        .app-link { color: var(--primary); text-decoration: underline; word-break: break-all; }
+        
+        /* Floating Add Post Button */
+        .floating-add-btn { display: none; position: fixed; bottom: 75px; right: 20px; background: var(--primary); color: white; width: 55px; height: 55px; border-radius: 50%; font-size: 24px; border: none; box-shadow: 0 4px 10px rgba(0,0,0,0.3); z-index: 20; cursor: pointer;}
+        
+        /* Bottom Navigation Bar */
+        .bottom-nav { position: absolute; bottom: 0; left: 0; right: 0; background: var(--card-bg); display: flex; justify-content: space-around; padding: 8px 0; border-top: 1px solid var(--border); z-index: 30; }
+        .nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-sub); cursor: pointer; width: 25%; transition: 0.2s; }
+        .nav-item.active { color: var(--primary); font-weight: bold; }
+        .nav-icon { font-size: 20px; margin-bottom: 2px; }
+        .nav-label { font-size: 0.75em; }
+
+        /* Modals Structure - Updated z-index to 3000 to overlay Settings page */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 3000; justify-content: center; align-items: center; backdrop-filter: blur(2px); }
+        .modal-content { background: var(--card-bg); width: 90%; max-width: 400px; padding: 20px; border-radius: 12px; transform: scale(0.9); animation: popup 0.2s forwards ease-out; }
+        @keyframes popup { to { transform: scale(1); } }
+        .modal-content h3 { margin-bottom: 15px; }
+        
+        /* Custom Popups UI */
+        .popup-btn-group { display: flex; gap: 10px; margin-top: 15px; }
+        .btn-secondary { width: 100%; padding: 12px; background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border); border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .btn-danger { width: 100%; padding: 12px; background: #e0245e; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+
+        /* Category Selector Button UI (For Create Post Modal) */
+        .category-selector { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+        .cat-btn { flex: 1; min-width: 80px; padding: 10px 5px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-color); color: var(--text-sub); cursor: pointer; text-align: center; font-weight: bold; transition: 0.2s; font-size: 0.85em; }
+        .cat-btn.selected { background: rgba(24, 119, 242, 0.1); color: var(--primary); border-color: var(--primary); }
+
+        /* Settings specific */
+        .setting-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .about-box { background: var(--bg-color); padding: 10px; border-radius: 8px; font-size: 0.9em; margin-top: 15px; line-height: 1.6;}
+        
+        /* Comments Box */
+        .comment-section { margin-top: 10px; background: var(--bg-color); padding: 10px; border-radius: 8px; display: none; }
+        .comment-item { margin-bottom: 8px; font-size: 0.9em; word-break: break-word; }
+        .comment-item span { font-weight: bold; color: var(--primary); margin-right: 5px;}
+        .comment-input-box { display: flex; gap: 10px; margin-top: 10px; }
+        .comment-input-box input { flex: 1; padding: 8px; border-radius: 20px; border: 1px solid var(--border); outline: none; background: var(--card-bg); color: var(--text-main); }
+        .comment-input-box button { background: var(--primary); color: white; border: none; padding: 8px 15px; border-radius: 20px; cursor: pointer; }
+
+
+        /* =========================================================
+           EchoFeed Professional Glass / Mirror UI Layer
+           UI-only overrides: application logic remains unchanged.
+           ========================================================= */
+        :root {
+            --bg-color: #eef3f8;
+            --card-bg: rgba(255,255,255,0.72);
+            --text-main: #172033;
+            --text-sub: #677386;
+            --primary: #2878f0;
+            --border: rgba(255,255,255,0.68);
+            --glass-bg: rgba(255,255,255,0.60);
+            --glass-strong: rgba(255,255,255,0.82);
+            --glass-border: rgba(255,255,255,0.78);
+            --shadow-soft: 0 12px 32px rgba(41,60,85,0.10);
+            --shadow-float: 0 18px 46px rgba(39,64,98,0.18);
+            --radius-lg: 22px;
+            --radius-md: 16px;
+            --radius-sm: 12px;
+        }
+
+        body.dark-mode {
+            --bg-color: #0d131c;
+            --card-bg: rgba(23,31,43,0.72);
+            --text-main: #eef4ff;
+            --text-sub: #a7b2c2;
+            --primary: #5b9dff;
+            --border: rgba(255,255,255,0.08);
+            --glass-bg: rgba(20,28,40,0.64);
+            --glass-strong: rgba(24,33,47,0.86);
+            --glass-border: rgba(255,255,255,0.10);
+            --shadow-soft: 0 14px 36px rgba(0,0,0,0.24);
+            --shadow-float: 0 22px 52px rgba(0,0,0,0.38);
+        }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            min-height: 100vh;
+            background:
+                radial-gradient(circle at 12% 10%, rgba(40,120,240,0.16), transparent 34%),
+                radial-gradient(circle at 88% 18%, rgba(111,214,255,0.13), transparent 31%),
+                radial-gradient(circle at 50% 100%, rgba(110,129,255,0.10), transparent 38%),
+                var(--bg-color);
+            transition: background-color .35s ease, color .35s ease;
+            overflow: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body::before,
+        body::after {
+            content: "";
+            position: fixed;
+            width: 260px;
+            height: 260px;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: -1;
+            filter: blur(12px);
+            opacity: .45;
+            animation: ambientFloat 11s ease-in-out infinite alternate;
+        }
+
+        body::before {
+            top: 8%;
+            left: -90px;
+            background: radial-gradient(circle, rgba(63,144,255,.18), transparent 68%);
+        }
+
+        body::after {
+            right: -90px;
+            bottom: 10%;
+            background: radial-gradient(circle, rgba(102,197,255,.16), transparent 68%);
+            animation-delay: -4s;
+        }
+
+        @keyframes ambientFloat {
+            from { transform: translate3d(0,0,0) scale(1); }
+            to { transform: translate3d(18px,-12px,0) scale(1.06); }
+        }
+
+        /* Login / setup */
+        .setup-screen {
+            position: relative;
+            isolation: isolate;
+            padding: 24px;
+        }
+
+        .setup-card {
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(145deg, rgba(255,255,255,.84), rgba(255,255,255,.48));
+            border: 1px solid var(--glass-border);
+            border-radius: 30px;
+            box-shadow: var(--shadow-float), inset 0 1px 0 rgba(255,255,255,.78);
+            backdrop-filter: blur(24px) saturate(145%);
+            -webkit-backdrop-filter: blur(24px) saturate(145%);
+            padding: 34px 28px 28px;
+            animation: setupEnter .65s cubic-bezier(.2,.8,.2,1) both;
+        }
+
+        body.dark-mode .setup-card {
+            background: linear-gradient(145deg, rgba(30,42,58,.84), rgba(18,25,36,.62));
+            box-shadow: var(--shadow-float), inset 0 1px 0 rgba(255,255,255,.08);
+        }
+
+        .setup-card::before {
+            content: "";
+            position: absolute;
+            width: 170px;
+            height: 170px;
+            top: -92px;
+            right: -55px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(72,155,255,.24), transparent 68%);
+            pointer-events: none;
+        }
+
+        @keyframes setupEnter {
+            from { opacity: 0; transform: translateY(18px) scale(.97); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .setup-card h1 {
+            position: relative;
+            margin-bottom: 9px;
+            font-size: 2rem;
+            letter-spacing: -.04em;
+            background: linear-gradient(120deg, #1d6ee8, #53b6ff 52%, #6b7dff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            text-shadow: 0 7px 24px rgba(40,120,240,.12);
+        }
+
+        .setup-card h1::after {
+            content: "✦";
+            display: inline-block;
+            margin-left: 6px;
+            font-size: .62em;
+            vertical-align: top;
+            animation: twinkle 2.8s ease-in-out infinite;
+        }
+
+        @keyframes twinkle {
+            0%,100% { opacity: .45; transform: translateY(0) rotate(0deg); }
+            50% { opacity: 1; transform: translateY(-2px) rotate(12deg); }
+        }
+
+        .input-box {
+            padding: 13px 14px;
+            margin-bottom: 11px;
+            border-radius: 14px;
+            border: 1px solid rgba(119,143,176,.20);
+            background: rgba(248,251,255,.68);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.72), 0 4px 12px rgba(40,60,90,.035);
+            transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease, background .2s ease;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        body.dark-mode .input-box {
+            background: rgba(8,14,23,.42);
+            border-color: rgba(255,255,255,.08);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+        }
+
+        .input-box:focus {
+            border-color: rgba(40,120,240,.56);
+            background: rgba(255,255,255,.84);
+            box-shadow: 0 0 0 4px rgba(40,120,240,.10), 0 10px 24px rgba(40,120,240,.08);
+            transform: translateY(-1px);
+        }
+
+        body.dark-mode .input-box:focus { background: rgba(15,24,37,.74); }
+
+        textarea.input-box { resize: vertical; min-height: 108px; }
+
+        .btn-primary,
+        .btn-secondary,
+        .btn-danger {
+            position: relative;
+            overflow: hidden;
+            border-radius: 14px;
+            min-height: 46px;
+            letter-spacing: -.01em;
+            box-shadow: 0 8px 18px rgba(40,80,130,.10), inset 0 1px 0 rgba(255,255,255,.20);
+            transition: transform .18s ease, box-shadow .2s ease, filter .2s ease, border-color .2s ease;
+        }
+
+        .btn-primary::after,
+        .btn-secondary::after,
+        .btn-danger::after,
+        .action-btn::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(100deg, transparent 35%, rgba(255,255,255,.24), transparent 65%);
+            transform: translateX(-120%);
+            transition: transform .55s ease;
+            pointer-events: none;
+        }
+
+        .btn-primary:hover,
+        .btn-secondary:hover,
+        .btn-danger:hover { transform: translateY(-2px); box-shadow: 0 12px 24px rgba(40,80,130,.14); }
+
+        .btn-primary:hover::after,
+        .btn-secondary:hover::after,
+        .btn-danger:hover::after { transform: translateX(120%); }
+
+        .btn-primary:active,
+        .btn-secondary:active,
+        .btn-danger:active { transform: translateY(0) scale(.985); }
+
+        .btn-primary { background: linear-gradient(135deg, #256fe4, #4e9dff); }
+        .btn-secondary {
+            background: rgba(255,255,255,.52);
+            color: var(--text-main);
+            border: 1px solid rgba(120,145,180,.18);
+        }
+        .btn-danger { background: linear-gradient(135deg, #df315d, #f25b79); }
+        body.dark-mode .btn-secondary { background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.08); }
+
+        /* Main application shell */
+        .app-container {
+            width: 100%;
+            max-width: 520px;
+            background: transparent;
+            box-shadow: 0 0 70px rgba(55,100,155,.08);
+        }
+
+        .app-container::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            background: linear-gradient(180deg, rgba(255,255,255,.08), transparent 22%);
+            z-index: 0;
+        }
+
+        .header {
+            position: relative;
+            z-index: 12;
+            padding: 12px 15px;
+            background: var(--glass-bg);
+            border-bottom: 1px solid var(--glass-border);
+            box-shadow: 0 8px 24px rgba(33,54,80,.07);
+            backdrop-filter: blur(22px) saturate(150%);
+            -webkit-backdrop-filter: blur(22px) saturate(150%);
+        }
+
+        .header h2 {
+            font-size: 1.38em;
+            letter-spacing: -.035em;
+            background: linear-gradient(100deg, var(--primary), #63b4ff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            position: relative;
+        }
+
+        .header-icons { gap: 8px; }
+        .header-icons span {
+            display: inline-grid;
+            place-items: center;
+            width: 39px;
+            height: 39px;
+            border-radius: 13px;
+            background: rgba(255,255,255,.34);
+            border: 1px solid rgba(255,255,255,.42);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.62);
+            transition: transform .2s ease, background .2s ease, box-shadow .2s ease;
+        }
+        body.dark-mode .header-icons span { background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.08); }
+        .header-icons span:hover { transform: translateY(-2px); background: rgba(255,255,255,.56); box-shadow: 0 7px 16px rgba(40,70,100,.10); }
+        .header-icons span:active { transform: scale(.94); }
+
+        .offline-banner {
+            margin: 7px 10px 0;
+            border: 1px solid rgba(255,179,0,.25);
+            border-radius: 12px;
+            background: rgba(255,171,0,.14);
+            color: #b86b00;
+            box-shadow: 0 8px 20px rgba(250,170,0,.08);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            animation: bannerPulse 2.4s ease-in-out infinite;
+        }
+        @keyframes bannerPulse { 0%,100% { box-shadow: 0 8px 20px rgba(250,170,0,.05); } 50% { box-shadow: 0 10px 28px rgba(250,170,0,.16); } }
+
+        .search-container {
+            padding: 10px 12px 12px;
+            background: rgba(255,255,255,.36);
+            border-bottom: 1px solid var(--glass-border);
+            backdrop-filter: blur(20px) saturate(140%);
+            -webkit-backdrop-filter: blur(20px) saturate(140%);
+        }
+        body.dark-mode .search-container { background: rgba(16,23,34,.40); }
+
+        .search-container .input-box { margin-bottom: 7px; }
+
+        .search-filters { gap: 8px; }
+        .search-select-btn {
+            padding: 11px 12px;
+            border-radius: 13px;
+            border: 1px solid rgba(110,138,173,.18);
+            background: rgba(255,255,255,.55);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.66), 0 6px 14px rgba(40,70,100,.05);
+            transition: .2s ease;
+        }
+        body.dark-mode .search-select-btn { background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.08); }
+        .search-select-btn:hover { transform: translateY(-1px); border-color: rgba(40,120,240,.32); }
+
+        .pull-indicator {
+            background: transparent;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        .feed {
+            position: relative;
+            z-index: 1;
+            padding: 12px 10px 86px;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(110,130,160,.25) transparent;
+        }
+
+        .feed::-webkit-scrollbar { width: 4px; }
+        .feed::-webkit-scrollbar-thumb { background: rgba(110,130,160,.28); border-radius: 999px; }
+
+        /* Feed cards */
+        .post-card {
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 14px;
+            padding: 15px;
+            border-radius: 20px;
+            background: linear-gradient(145deg, rgba(255,255,255,.74), rgba(255,255,255,.48));
+            border: 1px solid var(--glass-border);
+            box-shadow: var(--shadow-soft), inset 0 1px 0 rgba(255,255,255,.78);
+            backdrop-filter: blur(20px) saturate(135%);
+            -webkit-backdrop-filter: blur(20px) saturate(135%);
+            animation: postEnter .52s cubic-bezier(.2,.75,.2,1) both;
+            transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
+        }
+
+        body.dark-mode .post-card {
+            background: linear-gradient(145deg, rgba(31,42,57,.74), rgba(16,23,34,.56));
+            box-shadow: var(--shadow-soft), inset 0 1px 0 rgba(255,255,255,.05);
+        }
+
+        .post-card::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, rgba(80,164,255,.55), transparent);
+            opacity: .8;
+        }
+
+        .post-card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(80,150,240,.20);
+            box-shadow: 0 18px 40px rgba(42,70,104,.13), inset 0 1px 0 rgba(255,255,255,.82);
+        }
+
+        @keyframes postEnter {
+            from { opacity: 0; transform: translateY(12px) scale(.985); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .post-card:nth-child(2) { animation-delay: .035s; }
+        .post-card:nth-child(3) { animation-delay: .07s; }
+        .post-card:nth-child(4) { animation-delay: .105s; }
+        .post-card:nth-child(5) { animation-delay: .14s; }
+        .post-card:nth-child(6) { animation-delay: .175s; }
+
+        .post-header { margin-bottom: 10px; }
+        .post-author-box { gap: 7px; }
+        .post-author {
+            padding: 2px 0;
+            color: var(--text-main);
+            font-weight: 800;
+            letter-spacing: -.012em;
+        }
+
+        .post-author::before {
+            content: "";
+            display: inline-block;
+            width: 9px;
+            height: 9px;
+            margin-right: 6px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #48a2ff, #65d1bb);
+            box-shadow: 0 0 0 4px rgba(71,157,248,.10), 0 0 13px rgba(71,157,248,.24);
+            vertical-align: 1px;
+        }
+
+        .category-badge {
+            padding: 4px 9px;
+            border-radius: 999px;
+            background: rgba(42,123,236,.10);
+            border: 1px solid rgba(42,123,236,.13);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.50);
+        }
+
+        .post-time { color: var(--text-sub); opacity: .82; }
+        .post-text { line-height: 1.65; letter-spacing: .002em; }
+
+        .post-img,
+        .post-grid-img {
+            border-radius: 15px;
+            border: 1px solid rgba(255,255,255,.48);
+            box-shadow: 0 10px 24px rgba(29,46,70,.10);
+            transition: transform .25s ease, filter .25s ease, box-shadow .25s ease;
+        }
+
+        .post-img:hover,
+        .post-grid-img:hover {
+            transform: translateY(-2px);
+            filter: saturate(1.04) contrast(1.01);
+            box-shadow: 0 14px 30px rgba(29,46,70,.15);
+        }
+
+        .post-grid-img { height: 142px; }
+        .post-img-grid { gap: 7px; }
+
+        .post-actions {
+            padding-top: 9px;
+            border-top-color: rgba(112,135,165,.16);
+            gap: 7px;
+        }
+
+        .action-btn {
+            position: relative;
+            flex: 1;
+            justify-content: center;
+            min-height: 39px;
+            padding: 7px 8px;
+            border-radius: 12px;
+            color: var(--text-sub);
+            background: rgba(255,255,255,.22);
+            transition: background .2s ease, transform .18s ease, color .2s ease;
+        }
+        body.dark-mode .action-btn { background: rgba(255,255,255,.035); }
+        .action-btn:hover { background: rgba(60,135,240,.08); color: var(--primary); transform: translateY(-1px); }
+        .action-btn:active { transform: scale(.97); }
+        .action-btn.liked { color: #e33d68; background: rgba(227,61,104,.06); }
+
+        .comment-section {
+            margin-top: 10px;
+            padding: 11px;
+            border: 1px solid rgba(116,142,176,.12);
+            border-radius: 15px;
+            background: rgba(255,255,255,.26);
+            animation: commentReveal .25s ease both;
+        }
+        body.dark-mode .comment-section { background: rgba(255,255,255,.035); }
+        @keyframes commentReveal { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+        .comment-item { padding: 4px 0; }
+        .comment-input-box input {
+            border-color: rgba(116,142,176,.16) !important;
+            background: rgba(255,255,255,.60) !important;
+        }
+        body.dark-mode .comment-input-box input { background: rgba(10,17,27,.48) !important; }
+        .comment-input-box button {
+            min-width: 70px;
+            box-shadow: 0 8px 18px rgba(40,120,240,.16);
+            transition: transform .18s ease, box-shadow .18s ease;
+        }
+        .comment-input-box button:hover { transform: translateY(-1px); box-shadow: 0 11px 24px rgba(40,120,240,.22); }
+
+        /* Floating add button */
+        .floating-add-btn {
+            width: 58px;
+            height: 58px;
+            right: 18px;
+            bottom: 76px;
+            border: 1px solid rgba(255,255,255,.36);
+            background: linear-gradient(145deg, #327ef0, #5daaff);
+            box-shadow: 0 14px 30px rgba(38,108,215,.30), inset 0 1px 0 rgba(255,255,255,.35);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            animation: fabIn .45s .15s both cubic-bezier(.18,.9,.28,1.2), fabBreathe 3s 1s ease-in-out infinite;
+            transition: transform .2s ease, box-shadow .2s ease;
+        }
+        .floating-add-btn:hover { transform: translateY(-3px) rotate(-2deg); box-shadow: 0 18px 38px rgba(38,108,215,.38); }
+        .floating-add-btn:active { transform: scale(.92); }
+        @keyframes fabIn { from { opacity: 0; transform: scale(.65) translateY(18px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+        @keyframes fabBreathe { 0%,100% { box-shadow: 0 14px 30px rgba(38,108,215,.30), inset 0 1px 0 rgba(255,255,255,.35); } 50% { box-shadow: 0 16px 37px rgba(38,108,215,.38), 0 0 0 7px rgba(70,143,245,.06), inset 0 1px 0 rgba(255,255,255,.35); } }
+
+        /* Bottom navigation */
+        .bottom-nav {
+            position: absolute;
+            left: 9px;
+            right: 9px;
+            bottom: 8px;
+            padding: 6px;
+            border-radius: 19px;
+            background: rgba(255,255,255,.60);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 14px 32px rgba(40,63,92,.14), inset 0 1px 0 rgba(255,255,255,.76);
+            backdrop-filter: blur(22px) saturate(155%);
+            -webkit-backdrop-filter: blur(22px) saturate(155%);
+            z-index: 30;
+        }
+        body.dark-mode .bottom-nav { background: rgba(16,23,34,.68); box-shadow: 0 16px 36px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.06); }
+
+        .nav-item {
+            position: relative;
+            width: 25%;
+            min-height: 52px;
+            border-radius: 14px;
+            z-index: 1;
+            transition: transform .2s ease, color .2s ease;
+        }
+        .nav-item::before {
+            content: "";
+            position: absolute;
+            inset: 5px;
+            z-index: -1;
+            border-radius: 12px;
+            background: transparent;
+            transform: scale(.88);
+            transition: transform .25s ease, background .25s ease, box-shadow .25s ease;
+        }
+        .nav-item.active::before {
+            background: rgba(44,124,239,.11);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.44), 0 6px 17px rgba(44,124,239,.07);
+            transform: scale(1);
+        }
+        body.dark-mode .nav-item.active::before { background: rgba(74,145,247,.12); box-shadow: inset 0 1px 0 rgba(255,255,255,.04); }
+        .nav-item:hover { transform: translateY(-1px); }
+        .nav-icon { font-size: 19px; margin-bottom: 1px; transition: transform .2s ease; }
+        .nav-item.active .nav-icon { transform: translateY(-1px) scale(1.08); }
+        .nav-label { font-size: .74em; letter-spacing: .01em; }
+
+        /* Modal glass sheet */
+        .modal {
+            background: rgba(10,18,30,.42);
+            backdrop-filter: blur(12px) saturate(125%);
+            -webkit-backdrop-filter: blur(12px) saturate(125%);
+            animation: modalBackdrop .2s ease both;
+        }
+        .modal-content {
+            width: min(92%, 420px);
+            max-height: 84vh;
+            overflow-y: auto;
+            padding: 21px;
+            border-radius: 22px;
+            background: linear-gradient(145deg, rgba(255,255,255,.86), rgba(255,255,255,.60));
+            border: 1px solid rgba(255,255,255,.74);
+            box-shadow: 0 26px 75px rgba(20,34,55,.24), inset 0 1px 0 rgba(255,255,255,.84);
+            backdrop-filter: blur(24px) saturate(145%);
+            -webkit-backdrop-filter: blur(24px) saturate(145%);
+            animation: modalEnter .3s cubic-bezier(.18,.85,.24,1.04) both;
+        }
+        body.dark-mode .modal-content {
+            background: linear-gradient(145deg, rgba(29,41,57,.92), rgba(15,22,33,.76));
+            border-color: rgba(255,255,255,.10);
+            box-shadow: 0 30px 80px rgba(0,0,0,.46), inset 0 1px 0 rgba(255,255,255,.06);
+        }
+        @keyframes modalBackdrop { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes modalEnter { from { opacity: 0; transform: translateY(16px) scale(.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+        .modal-content h3 { font-size: 1.15rem; letter-spacing: -.025em; }
+        .modal-content h4 { letter-spacing: -.02em; }
+
+        .popup-btn-group { gap: 9px; }
+        .cat-btn {
+            min-height: 46px;
+            border-radius: 13px;
+            border-color: rgba(113,140,176,.16);
+            background: rgba(255,255,255,.44);
+            transition: transform .2s ease, border-color .2s ease, background .2s ease, color .2s ease, box-shadow .2s ease;
+        }
+        body.dark-mode .cat-btn { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.08); }
+        .cat-btn:hover { transform: translateY(-1px); border-color: rgba(40,120,240,.30); }
+        .cat-btn.selected {
+            background: rgba(40,120,240,.11);
+            border-color: rgba(40,120,240,.46);
+            box-shadow: 0 8px 20px rgba(40,120,240,.08), inset 0 1px 0 rgba(255,255,255,.56);
+        }
+
+        .about-box {
+            border: 1px solid rgba(112,138,173,.12);
+            background: rgba(255,255,255,.30);
+            border-radius: 14px;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+        body.dark-mode .about-box { background: rgba(255,255,255,.04); }
+
+        /* Native controls */
+        input[type="checkbox"] { accent-color: var(--primary); transform: scale(1.16); }
+        input[type="range"] { accent-color: var(--primary); width: 46%; cursor: pointer; }
+        input[type="file"] { padding: 9px; }
+        input[type="file"]::file-selector-button {
+            margin-right: 9px;
+            padding: 8px 11px;
+            border: 0;
+            border-radius: 10px;
+            background: rgba(40,120,240,.11);
+            color: var(--primary);
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        /* Image viewer */
+        #imageViewerModal > div {
+            animation: viewerEnter .28s cubic-bezier(.18,.85,.24,1.04) both;
+        }
+        #fullImg {
+            border: 1px solid rgba(255,255,255,.42) !important;
+            box-shadow: 0 28px 70px rgba(0,0,0,.34);
+        }
+        @keyframes viewerEnter { from { opacity: 0; transform: scale(.93); } to { opacity: 1; transform: scale(1); } }
+
+        /* Respect reduced-motion accessibility preference. */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: .01ms !important;
+                animation-iteration-count: 1 !important;
+                scroll-behavior: auto !important;
+                transition-duration: .01ms !important;
+            }
+        }
+
+        @media (min-width: 700px) {
+            body { display: flex; justify-content: center; align-items: center; padding: 18px; }
+            .app-container, #settingsPage { height: calc(100vh - 36px); max-height: 920px; border: 1px solid rgba(255,255,255,.38); border-radius: 28px; overflow: hidden; box-shadow: 0 26px 80px rgba(39,63,91,.16); }
+            .setup-screen { width: min(100%, 520px); height: 100vh; }
+            .bottom-nav { left: 12px; right: 12px; bottom: 12px; }
+        }
+
+        @media (max-width: 380px) {
+            .setup-card { padding: 28px 20px 22px; }
+            .post-card { padding: 13px; border-radius: 18px; }
+            .nav-label { font-size: .68em; }
+            .floating-add-btn { width: 54px; height: 54px; right: 15px; }
+        }
+
+        /* Guide + Privacy Policy settings UI */
+        .settings-action-btn {
+            width: 100%;
+            margin-top: 2px;
+            padding: 11px 14px;
+            border-radius: 14px;
+            border: 1px solid rgba(40,120,240,.20);
+            background: linear-gradient(145deg, rgba(255,255,255,.58), rgba(255,255,255,.30));
+            color: var(--text-main);
+            font-weight: 750;
+            text-align: left;
+            cursor: pointer;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.68), 0 7px 18px rgba(40,70,100,.06);
+            transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease, background .18s ease;
+        }
+        .settings-action-btn:hover { transform: translateY(-1px); border-color: rgba(40,120,240,.38); box-shadow: 0 10px 24px rgba(40,90,150,.10), inset 0 1px 0 rgba(255,255,255,.72); }
+        .settings-action-btn:active { transform: scale(.985); }
+        body.dark-mode .settings-action-btn { background: linear-gradient(145deg, rgba(255,255,255,.07), rgba(255,255,255,.035)); border-color: rgba(255,255,255,.10); }
+        .guide-list { display: grid; gap: 10px; margin-top: 10px; }
+        .guide-item { display: flex; gap: 10px; align-items: flex-start; padding: 11px 12px; border-radius: 14px; background: rgba(255,255,255,.34); border: 1px solid rgba(110,138,173,.12); line-height: 1.55; }
+        body.dark-mode .guide-item { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.08); }
+        .guide-number { flex: 0 0 26px; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; background: rgba(40,120,240,.11); color: var(--primary); font-weight: 800; font-size: .82em; }
+
+    
+        /* Saved Posts feature */
+        #navSaved { width: 20%; }
+        .save-action.saved { color: var(--primary); background: rgba(40,120,240,.09); }
+        body.dark-mode .save-action.saved { background: rgba(91,157,255,.11); }
+        .saved-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:48%; padding:34px 20px; text-align:center; color:var(--text-sub); animation:postEnter .45s ease both; }
+        .saved-empty .saved-empty-icon { width:66px; height:66px; display:grid; place-items:center; margin-bottom:14px; border-radius:22px; background:rgba(40,120,240,.09); border:1px solid rgba(40,120,240,.14); box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 12px 25px rgba(40,90,150,.08); font-size:28px; }
+        .saved-empty strong { color:var(--text-main); font-size:1.02em; margin-bottom:5px; }
+        @media (max-width:380px) { #navSaved{width:20%;} .nav-label{font-size:.64em;} }
+
+    </style>
+</head>
+<body>
+
+<!-- Login Screen -->
+<div class="setup-screen" id="setupScreen">
+    <div class="setup-card">
+        <h1>EchoFeed</h1>
+        <p style="color: var(--text-sub); margin-bottom: 20px; font-size: 0.9em;">(English စာလုံး သီးသန့်သာ ရိုက်ပါ။)</p>
+        <input type="text" id="usernameInput" class="input-box" placeholder="Username (e.g. john_doe)">
+        
+        <!-- Admin PIN Hidden by default -->
+        <input type="password" id="pinInput" class="input-box" placeholder="Admin PIN" style="display: none;">
+        
+        <button class="btn-primary" id="loginBtn" onclick="login()">Enter App</button>
+
+        <!-- Admin Login Toggle -->
+        <div style="margin-top: 15px; font-size: 0.85em;">
+            <span style="color: var(--text-sub); cursor: pointer; text-decoration: underline;" onclick="toggleAdminLogin()">Admin Login</span>
+        </div>
+    </div>
+</div>
+
+<!-- Main Feed App -->
+<div class="app-container" id="appContainer">
+    <div class="header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <div class="header-icons">
+                <span onclick="handleAppBack()" title="Back">🔙</span>
+            </div>
+            <h2>EchoFeed</h2>
+        </div>
+        <div class="header-icons">
+            <span onclick="toggleSearchContainer()" title="Search">🔍</span>
+            <!-- Changed settings button action to open page -->
+            <span onclick="openSettingsPage()" title="Settings">⚙️</span>
+        </div>
+    </div>
+    
+    <!-- Offline Alert Banner -->
+    <div class="offline-banner" id="offlineBanner">📡 Offline Mode (သိမ်းဆည်းထားသည်များကို ပြသနေသည်။)</div>
+
+    <!-- Search & Filter Area (Filters removed as per request) -->
+    <div class="search-container" id="searchContainer">
+        <input type="text" id="searchInput" class="input-box" placeholder="Search posts..." oninput="filterAndRenderFeed()" style="margin-bottom: 0;">
+    </div>
+
+    <!-- Pull to refresh indicator -->
+    <div class="pull-indicator" id="pullIndicator">အောက်သို့ဆွဲပါ...</div>
+
+    <div class="feed" id="feedBox">
+        <!-- Posts will load here -->
+    </div>
+
+    <!-- Admin Create Post FAB -->
+    <button class="floating-add-btn" id="addPostBtn" onclick="openModal('createPostModal')">✏️</button>
+
+    <!-- Bottom Navigation Bar -->
+    <div class="bottom-nav">
+        <div class="nav-item active" id="navFeeds" onclick="switchNavTab('all')">
+            <span class="nav-icon">🏠</span>
+            <span class="nav-label">Feeds</span>
+        </div>
+        <div class="nav-item" id="navKnowledge" onclick="switchNavTab('Knowledge')">
+            <span class="nav-icon">📚</span>
+            <span class="nav-label">Knowledge</span>
+        </div>
+        <div class="nav-item" id="navQA" onclick="switchNavTab('Q & A')">
+            <span class="nav-icon">❓</span>
+            <span class="nav-label">Q & A</span>
+        </div>
+        <div class="nav-item" id="navOthers" onclick="switchNavTab('Others')">
+            <span class="nav-icon">📌</span>
+            <span class="nav-label">Others</span>
+        </div>
+        <div class="nav-item" id="navSaved" onclick="switchNavTab('saved')">
+            <span class="nav-icon">🔖</span>
+            <span class="nav-label">Saved</span>
+        </div>
+    </div>
+</div>
+
+<!-- Settings Page -->
+<div id="settingsPage" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-color); z-index: 2000; flex-direction: column;">
+    <div class="header" style="position: sticky; top: 0; display: flex; justify-content: flex-start; align-items: center; gap: 15px;">
+        <div class="header-icons">
+            <span onclick="closeSettingsPage()" title="Back">🔙</span>
+        </div>
+        <h2>Settings</h2>
+    </div>
+    <div style="padding: 20px; overflow-y: auto; flex: 1; max-width: 500px; margin: 0 auto; width: 100%;">
+        <div class="setting-item">
+            <span>Dark Mode</span>
+            <input type="checkbox" id="darkModeToggle" onchange="toggleDarkMode()">
+        </div>
+        <div class="setting-item">
+            <span>Text Size</span>
+            <input type="range" min="12" max="22" value="15" oninput="changeTextSize(this.value)">
+        </div>
+
+        <button class="settings-action-btn" type="button" onclick="openModal('guideModal')">📖 &nbsp;လမ်းညွှန်</button>
+
+        <h4 style="margin-top: 20px; color: var(--primary);">About App</h4>
+        <div class="about-box">
+            This app is a beta version (version 1.0) of EchoFeed, a free app that shares knowledge and technology on land, environmental, and climate justice.
+<br>
+            ဤ app သည် မြေယာ၊ ပတ်ဝန်းကျင်နှင့် ရာသီဥတုတရားမျှတမှုဆိုင်ရာ ဗဟုသုတနှင့် နည်းပညာများကို အခမဲ့မျှဝေပေးသည့် EchoFeed ၏ စမ်းသပ်ဗားရှင်း(1.0) ဖြစ်ပါသည်။<br>"EchoFeed Team"
+        </div>
+
+        <button class="settings-action-btn" style="margin-top: 15px;" type="button" onclick="openPrivacyPolicy()">🔒 &nbsp;Privacy Policy</button>
+    </div>
+</div>
+
+<!-- App Guide Modal -->
+<div class="modal" id="guideModal">
+    <div class="modal-content">
+        <h3>📖 App အသုံးပြုနည်း လမ်းညွှန်</h3>
+        <p style="color:var(--text-sub); line-height:1.55; margin-bottom:10px;">
+            EchoFeed ကို အလွယ်တကူ အသုံးပြုနိုင်ရန် အောက်ပါအတိုင်း လုပ်ဆောင်နိုင်ပါတယ် -
+        </p>
+        <div class="guide-list">
+            <div class="guide-item"><span class="guide-number">၁</span><div>Username(အသုံးပြုသူအမည်)ကို အင်္ဂလိပ်စာလုံးသာ အသုံးပြုနိုင်ပြီး တစ်ဆက်တည်း ရေးသားရပါမည်။</div></div>
+            <div class="guide-item"><span class="guide-number">၂</span><div>ဖုန်းတစ်လုံးတွင် username တစ်မျိုးသာ အသုံးပြုခွင့်ရှိသည့်အတွက် အသုံးပြုဖူးသော username ကို မှတ်သားထားရန် လိုအပ်ပါသည်။ အခက်အခဲရှိပါက EchoFeed Admin Team ထံ ဆက်သွယ်နိုင်ပါသည်။ </div></div>
+            <div class="guide-item"><span class="guide-number">၃</span><div>မိမိသိမ်းဆည်းထားလိုသော post များကို Save လုပ်ကာ နောက်မှ <strong>Saved</strong>တွင် ပြန်ကြည့်နိုင်ပါသည်။</div></div>
+            <div class="guide-item"><span class="guide-number">၄</span><div>Internet မရှိချိန်တွင် ယခင်ကြည့်ရှုထားသော post များကို အင်တာနက်မလိုအပ်ဘဲ ပြန်လည်ကြည့်ရှုနိုင်ပါသည်။</div></div>
+        </div>
+        <button class="btn-primary" style="margin-top: 16px;" onclick="closeModals()">နားလည်ပါပြီ</button>
+    </div>
+</div>
+
+<!-- Create Post Modal (Admin Only) -->
+<div class="modal" id="createPostModal">
+    <div class="modal-content">
+        <h3>Create New Post</h3>
+        <label style="font-size:0.85em; color:var(--text-sub); display:block; margin-bottom:8px;">Category ရွေးချယ်ပါ။</label>
+        
+        <!-- Custom UI for Post Category Selection -->
+        <input type="hidden" id="postCategory" value="Knowledge">
+        <div class="category-selector">
+            <div class="cat-btn selected" id="catBtn_Knowledge" onclick="selectPostCategory('Knowledge')">📚 Knowledge</div>
+            <div class="cat-btn" id="catBtn_QA" onclick="selectPostCategory('Q & A')">❓ Q & A</div>
+            <div class="cat-btn" id="catBtn_Others" onclick="selectPostCategory('Others')">📌 Others</div>
+        </div>
+
+        <textarea id="postText" class="input-box" rows="4" placeholder="What's on your mind?"></textarea>
+        
+        <label style="font-size:0.85em; color:var(--text-sub); display:block; margin-bottom:5px;">ဓာတ်ပုံများ (အများဆုံး ၁၀ ပုံ):</label>
+        <input type="file" id="postImage" class="input-box" accept="image/*" multiple>
+        
+        <button class="btn-primary" onclick="publishPost()" id="publishBtn">Publish</button>
+        <button class="btn-primary" style="margin-top: 10px; background: transparent; color: var(--text-sub);" onclick="closeModals()">Cancel</button>
+    </div>
+</div>
+
+<!-- Action Options Modal (Admin Edit/Delete) -->
+<div class="modal" id="actionModal">
+    <div class="modal-content" style="text-align: center;">
+        <h3>Admin Actions</h3>
+        <button class="btn-primary" style="margin-bottom: 10px;" onclick="openEditPrompt()">Edit Post</button>
+        <button class="btn-primary" style="background: #e0245e; margin-bottom: 10px;" onclick="promptDeletePost()">Delete Post</button>
+        <button class="btn-primary" style="background: var(--bg-color); color: var(--text-main);" onclick="closeModals()">Cancel</button>
+    </div>
+</div>
+
+<!-- Custom Edit Post Modal -->
+<div class="modal" id="editModal">
+    <div class="modal-content">
+        <h3>Edit Post</h3>
+        <textarea id="editPostText" class="input-box" rows="4"></textarea>
+        <div class="popup-btn-group">
+            <button class="btn-primary" onclick="submitEdit()">Save</button>
+            <button class="btn-secondary" onclick="closeModals()">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<!-- Custom Alert Modal -->
+<div class="modal" id="customAlertModal">
+    <div class="modal-content" style="text-align: center;">
+        <h3 id="alertTitle" style="color: var(--primary);">Notice</h3>
+        <p id="alertMessage" style="margin-bottom: 20px; line-height: 1.5;"></p>
+        <button class="btn-primary" onclick="closeModals()">OK</button>
+    </div>
+</div>
+
+<!-- Custom Confirm Modal -->
+<div class="modal" id="customConfirmModal">
+    <div class="modal-content" style="text-align: center;">
+        <h3 style="color: #e0245e;">Confirmation</h3>
+        <p id="confirmMessage" style="margin-bottom: 20px; line-height: 1.5;"></p>
+        <div class="popup-btn-group">
+            <button class="btn-danger" id="confirmYesBtn">Yes</button>
+            <button class="btn-secondary" onclick="closeModals()">No</button>
+        </div>
+    </div>
+</div>
+
+<!-- App Exit Confirmation Modal -->
+<div class="modal" id="exitConfirmModal">
+    <div class="modal-content" style="text-align: center;">
+        <h3 style="color: #e0245e; margin-bottom: 15px;">App မှ ထွက်မည်</h3>
+        <p style="margin-bottom: 20px; color: var(--text-main);">EchoFeed မှ ထွက်မှာ သေချာပါသလား?</p>
+        <div class="popup-btn-group">
+            <button class="btn-secondary" onclick="cancelExit()">No</button>
+            <button class="btn-danger" onclick="confirmExit()">Yes</button>
+        </div>
+    </div>
+</div>
+
+<!-- Version Update Modal -->
+<div class="modal" id="versionUpdateModal">
+    <div class="modal-content" style="text-align: center;">
+        <h3 style="color: var(--primary); margin-bottom: 15px;">Update Available</h3>
+        <p style="margin-bottom: 20px; color: var(--text-main);">version update ရပါပြီ။</p>
+        <div class="popup-btn-group">
+            <button class="btn-primary" id="confirmUpdateBtn">Update</button>
+            <button class="btn-secondary" onclick="cancelUpdate()">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<!-- Full Image Viewer Modal -->
+<div class="modal" id="imageViewerModal" onclick="closeModals()">
+    <div style="max-width:95%; max-height:90vh; text-align: center;" onclick="event.stopPropagation()">
+        <img id="fullImg" style="width:100%; height:auto; max-height:75vh; object-fit:contain; border-radius:8px; margin-bottom:15px;">
+        <div style="display: flex; gap: 10px; justify-content: center;">
+            <button class="btn-primary" style="width: auto; padding: 10px 20px;" onclick="downloadCurrentImage()">Save Image</button>
+            <button class="btn-secondary" style="width: auto; padding: 10px 20px; background: rgba(0,0,0,0.5); color: white; border: 1px solid white;" onclick="closeModals()">Close</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const APP_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxQzmpGss0BNpZlydcYZdwyngoulSMLsUjQgQzF48t100Wd7m-hgrdjIZqmOw6fpvdW/exec"; 
+    const IMGBB_API_KEY = "65e88824502b51c573d48107aa9d0049";
+    const APP_CURRENT_VERSION = "1.0"; // Update version control (change this value when you release a new version)
+
+    let currentUser = "";
+    let userRole = "user"; 
+    let currentActionPostId = "";
+    let confirmCallback = null;
+    let rawPostsCache = []; 
+    let currentActiveTab = "all"; 
+    let currentViewingImage = "";
+    let savedPostIds = new Set(); 
+    
+    // Filter State Variables
+    let currentCategoryFilter = "all";
+    let currentMonthFilter = "all";
+    let isSettingsOpen = false;
+
+    // History state trapping for Android Back Button logic
+    function initHistoryTrap() {
+        if (!window.historyTrapInitialized) {
+            history.pushState({ page: 'root' }, "");
+            history.pushState({ page: 'main' }, "");
+            window.historyTrapInitialized = true;
+        }
+    }
+
+    window.addEventListener('popstate', (e) => {
+        if (isSettingsOpen) {
+            document.getElementById('settingsPage').style.display = "none";
+            isSettingsOpen = false;
+            return;
+        }
+
+        let openModals = Array.from(document.querySelectorAll('.modal')).filter(m => m.style.display === "flex" && m.id !== "exitConfirmModal");
+        if (openModals.length > 0) {
+            openModals.forEach(m => m.style.display = "none");
+            history.pushState({ page: 'main' }, "");
+            return;
+        }
+
+        if (e.state && e.state.page === 'root') {
+            openModal('exitConfirmModal');
+            history.pushState({ page: 'main' }, "");
+        } else if (!e.state) {
+            openModal('exitConfirmModal');
+            history.pushState({ page: 'main' }, "");
+        }
+    });
+
+    function getSavedPostsStorageKey() {
+        return "echofeed_saved_posts_" + (currentUser || "guest");
+    }
+
+    function loadSavedPosts() {
+        savedPostIds = new Set();
+        try {
+            const saved = JSON.parse(localStorage.getItem(getSavedPostsStorageKey()) || "[]");
+            if (Array.isArray(saved)) savedPostIds = new Set(saved.map(String));
+        } catch (e) { savedPostIds = new Set(); }
+    }
+
+    function persistSavedPosts() {
+        localStorage.setItem(getSavedPostsStorageKey(), JSON.stringify(Array.from(savedPostIds)));
+    }
+
+    function isPostSaved(postId) {
+        return savedPostIds.has(String(postId));
+    }
+
+    function toggleSavePost(postId) {
+        const id = String(postId);
+        if (savedPostIds.has(id)) savedPostIds.delete(id);
+        else savedPostIds.add(id);
+        persistSavedPosts();
+
+        if (currentActiveTab === "saved") {
+            filterAndRenderFeed();
+            return;
+        }
+
+        const btn = document.querySelector(`#post_${postId} .save-action`);
+        if (btn) {
+            const saved = isPostSaved(postId);
+            btn.classList.toggle("saved", saved);
+            btn.innerHTML = saved ? "🔖 <span>Saved</span>" : "🔖 <span>Save</span>";
+            btn.setAttribute("aria-label", saved ? "Unsave post" : "Save post");
+        }
+    }
+
+    function linkify(text) {
+        if (!text) return "";
+        let urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
+        return text.replace(urlRegex, function(url) {
+            return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="app-link">${url}</a>`;
+        });
+    }
+
+    function customAlert(message, title = "Notification") {
+        document.getElementById("alertTitle").innerText = title;
+        document.getElementById("alertMessage").innerText = message;
+        openModal("customAlertModal");
+    }
+
+    function customConfirm(message, callback) {
+        document.getElementById("confirmMessage").innerText = message;
+        confirmCallback = callback;
+        openModal("customConfirmModal");
+    }
+
+    document.getElementById("confirmYesBtn").addEventListener("click", () => {
+        closeModals();
+        if (confirmCallback) confirmCallback();
+    });
+
+    window.addEventListener('DOMContentLoaded', () => {
+        let savedUser = localStorage.getItem("echofeed_username");
+        if (savedUser) {
+            currentUser = savedUser;
+            document.getElementById("usernameInput").value = savedUser;
+            loadSavedPosts();
+            
+            setTimeout(() => { initHistoryTrap(); }, 100);
+        }
+        setupPullToRefresh();
+        checkAppUpdate(); // Check for version update when app loads
+    });
+
+    // App Update Checking Function
+    async function checkAppUpdate() {
+        try {
+            // Fetch version.json from root directory (Netlify)
+            let response = await fetch('/version.json?t=' + new Date().getTime());
+            if (response.ok) {
+                let data = await response.json();
+                if (data.version && data.version !== APP_CURRENT_VERSION) {
+                    openModal('versionUpdateModal');
+                    document.getElementById('confirmUpdateBtn').onclick = function() {
+                        if (data.downloadUrl) {
+                            window.open(data.downloadUrl, '_blank');
+                        } else {
+                            window.location.reload(true);
+                        }
+                    };
+                }
+            }
+        } catch (error) {
+            // Fail silently if offline or file doesn't exist
+            console.log("No update available or offline.");
+        }
+    }
+
+    function cancelUpdate() {
+        document.getElementById('versionUpdateModal').style.display = "none";
+    }
+
+    // Custom Top Header Back Button Logic
+    function handleAppBack() {
+        if (window.history.length > 2) {
+            window.history.back();
+        } else {
+            customAlert("ပင်မစာမျက်နှာ (Home) သို့ ရောက်ရှိနေပါသည်။", "EchoFeed");
+        }
+    }
+
+    function toggleAdminLogin() {
+        let pinInput = document.getElementById("pinInput");
+        if (pinInput.style.display === "none") {
+            pinInput.style.display = "block";
+            pinInput.focus();
+        } else {
+            pinInput.style.display = "none";
+            pinInput.value = ""; 
+        }
+    }
+
+    async function login() {
+        let username = document.getElementById("usernameInput").value.trim();
+        let pin = document.getElementById("pinInput").value;
+        let loginBtn = document.getElementById("loginBtn");
+        
+        let engRegex = /^[a-zA-Z0-9_]+$/;
+        if (!engRegex.test(username)) {
+            customAlert("အင်္ဂလိပ်စာလုံး သီးသန့်သာ အသုံးပြုပါ။", "Warning");
+            return;
+        }
+
+        // Loading state UI update
+        loginBtn.innerText = "ခဏစောင့်ပေးပါ...";
+        loginBtn.disabled = true;
+
+        let deviceId = localStorage.getItem("echofeed_device");
+        if (!deviceId) {
+            deviceId = "dev_" + Math.random().toString(36).substring(2) + Date.now();
+            localStorage.setItem("echofeed_device", deviceId);
+        }
+
+        try {
+            let res = await fetch(`${APP_SCRIPT_URL}?action=verify&username=${username}&deviceId=${deviceId}&pin=${pin}`);
+            let data = await res.json();
+
+            if (data.status === "success") {
+                currentUser = username;
+                userRole = data.role;
+                localStorage.setItem("echofeed_username", username);
+                loadSavedPosts();
+                
+                document.getElementById("setupScreen").style.display = "none";
+                document.getElementById("appContainer").style.display = "flex";
+                
+                initHistoryTrap();
+                
+                if (userRole === "admin") document.getElementById("addPostBtn").style.display = "block";
+                loadFeed();
+            } else {
+                customAlert(data.message, "Login Failed");
+                loginBtn.innerText = "Enter App";
+                loginBtn.disabled = false;
+            }
+        } catch(e) {
+            let savedUser = localStorage.getItem("echofeed_username");
+            if (savedUser && savedUser === username) {
+                currentUser = username;
+                loadSavedPosts();
+                document.getElementById("setupScreen").style.display = "none";
+                document.getElementById("appContainer").style.display = "flex";
+                
+                initHistoryTrap();
+                
+                loadFeed();
+            } else {
+                customAlert("အင်တာနက်လိုင်း စစ်ဆေးပါ သို့မဟုတ် မူလဝင်ထားဖူးသော အကောင့်ဖြစ်ရပါမည်။", "Offline Error");
+                loginBtn.innerText = "Enter App";
+                loginBtn.disabled = false;
+            }
+        }
+    }
+
+    function parsePostCategory(text) {
+        let category = "Knowledge"; 
+        let cleanText = text || "";
+
+        if (cleanText.startsWith("[Q & A]")) {
+            category = "Q & A";
+            cleanText = cleanText.replace("[Q & A]", "").trim();
+        } else if (cleanText.startsWith("[Others]")) {
+            category = "Others";
+            cleanText = cleanText.replace("[Others]", "").trim();
+        } else if (cleanText.startsWith("[Knowledge]")) {
+            category = "Knowledge";
+            cleanText = cleanText.replace("[Knowledge]", "").trim();
+        }
+        return { category, text: cleanText };
+    }
+
+    function renderPostImages(imageRaw) {
+        if (!imageRaw) return "";
+        let urls = [];
+
+        if (typeof imageRaw === "string") {
+            try {
+                let parsed = JSON.parse(imageRaw);
+                if (Array.isArray(parsed)) urls = parsed;
+                else if (typeof parsed === "string") urls = [parsed];
+            } catch (e) {
+                if (imageRaw.startsWith("http")) {
+                    urls = imageRaw.split(",").map(u => u.trim());
+                }
+            }
+        }
+
+        if (urls.length === 0) return "";
+
+        if (urls.length === 1) {
+            return `<img src="${urls[0]}" class="post-img" loading="lazy" onclick="openImageModal('${urls[0]}')" onerror="this.style.display='none'">`;
+        }
+
+        let gridHtml = `<div class="post-img-grid">`;
+        urls.forEach(url => {
+            gridHtml += `<img src="${url}" class="post-grid-img" loading="lazy" onclick="openImageModal('${url}')" onerror="this.style.display='none'">`;
+        });
+        gridHtml += `</div>`;
+        return gridHtml;
+    }
+
+    function openImageModal(url) {
+        currentViewingImage = url;
+        document.getElementById("fullImg").src = url;
+        openModal("imageViewerModal");
+    }
+
+    async function downloadCurrentImage() {
+        if (!currentViewingImage) return;
+        try {
+            let res = await fetch(currentViewingImage);
+            let blob = await res.blob();
+            let blobUrl = window.URL.createObjectURL(blob);
+            
+            let a = document.createElement("a");
+            a.style.display = "none";
+            a.href = blobUrl;
+            a.download = "EchoFeed_" + Date.now() + ".jpg";
+            document.body.appendChild(a);
+            a.click();
+            
+            window.URL.revokeObjectURL(blobUrl);
+            document.body.removeChild(a);
+        } catch (e) {
+            let a = document.createElement("a");
+            a.href = currentViewingImage;
+            a.download = "EchoFeed_" + Date.now() + ".jpg";
+            a.target = "_blank";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+    }
+
+    async function loadFeed() {
+        let feedBox = document.getElementById("feedBox");
+        let offlineBanner = document.getElementById("offlineBanner");
+
+        let cachedData = localStorage.getItem("echofeed_cached_posts");
+        if (cachedData && rawPostsCache.length === 0) {
+            try {
+                rawPostsCache = JSON.parse(cachedData);
+                filterAndRenderFeed();
+            } catch(e){}
+        }
+
+        if (rawPostsCache.length === 0) {
+            feedBox.innerHTML = "<p style='text-align:center; padding-top:20px;'>Loading posts...</p>";
+        }
+
+        try {
+            let res = await fetch(`${APP_SCRIPT_URL}?action=getFeed`);
+            if (!res.ok) throw new Error("Network response was not ok");
+            
+            rawPostsCache = await res.json();
+            
+            localStorage.setItem("echofeed_cached_posts", JSON.stringify(rawPostsCache));
+            offlineBanner.style.display = "none";
+            
+            filterAndRenderFeed();
+        } catch (err) {
+            offlineBanner.style.display = "block";
+            
+            if (rawPostsCache.length === 0 && cachedData) {
+                rawPostsCache = JSON.parse(cachedData);
+                filterAndRenderFeed();
+            } else if (rawPostsCache.length === 0) {
+                feedBox.innerHTML = "<p style='text-align:center; color:var(--text-sub); margin-top:30px;'>အင်တာနက် မရှိသေးပါ (Offline)။ သိမ်းဆည်းထားသော ပို့စ်များ မရှိသေးပါ။</p>";
+            }
+        }
+    }
+
+    function filterAndRenderFeed() {
+        let feedBox = document.getElementById("feedBox");
+        let searchVal = document.getElementById("searchInput").value.toLowerCase().trim();
+
+        feedBox.innerHTML = "";
+
+        let filtered = rawPostsCache.filter(post => {
+            let parsed = parsePostCategory(post.text);
+            
+            if (currentActiveTab === "saved" && !isPostSaved(post.id)) return false;
+            if (currentActiveTab !== "all" && currentActiveTab !== "saved" && parsed.category !== currentActiveTab) return false;
+            if (currentCategoryFilter !== "all" && parsed.category !== currentCategoryFilter) return false;
+            if (searchVal && !parsed.text.toLowerCase().includes(searchVal)) return false;
+
+            if (currentMonthFilter !== "all" && post.time) {
+                let dateObj = new Date(post.time);
+                if (!isNaN(dateObj.getTime())) {
+                    let monthKey = dateObj.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+                    if (monthKey !== currentMonthFilter) return false;
+                }
+            }
+
+            return true;
+        });
+
+        if (filtered.length === 0) {
+            if (currentActiveTab === "saved") {
+                feedBox.innerHTML = `<div class="saved-empty"><div class="saved-empty-icon">🔖</div><strong>Saved Posts မရှိသေးပါ။</strong><div>သိမ်းထားချင်တဲ့ Post ရဲ့ 🔖 Save ခလုတ်ကိုနှိပ်ပြီး ဒီနေရာမှာ ပြန်ကြည့်နိုင်ပါတယ်။</div></div>`;
+            } else {
+                feedBox.innerHTML = "<p style='text-align:center; color:var(--text-sub); margin-top:30px;'>ပို့စ်များ မရှိသေးပါ သို့မဟုတ် ရှာမတွေ့ပါ။</p>";
+            }
+            return;
+        }
+
+        filtered.forEach(post => {
+            let parsed = parsePostCategory(post.text);
+            let isLiked = post.likes.includes(currentUser);
+            let likeColor = isLiked ? '❤️' : '🤍';
+            let commentsHtml = post.comments.map(c => `<div class="comment-item"><span>${c.user}</span>${linkify(c.text)}</div>`).join('');
+            let adminBtn = userRole === "admin" ? `<span onclick="openAdminAction('${post.id}')" style="cursor:pointer;">⚙️</span>` : "";
+
+            let categoryBadge = "📚 Knowledge";
+            if (parsed.category === "Q & A") categoryBadge = "❓ Q & A";
+            if (parsed.category === "Others") categoryBadge = "📌 Others";
+
+            let imagesHtml = renderPostImages(post.image);
+
+            let html = `
+                <div class="post-card" id="post_${post.id}">
+                    <div class="post-header">
+                        <div>
+                            <div class="post-author-box">
+                                <span class="post-author">Admin</span>
+                                <span class="category-badge">${categoryBadge}</span>
+                            </div>
+                            <div class="post-time">${post.time}</div>
+                        </div>
+                        ${adminBtn}
+                    </div>
+                    <div class="post-text">${linkify(parsed.text)}</div>
+                    ${imagesHtml}
+                    
+                    <div class="post-actions">
+                        <button class="action-btn" onclick="toggleLike('${post.id}')">${likeColor} <span id="like_count_${post.id}">${post.likes.length}</span></button>
+                        <button class="action-btn save-action ${isPostSaved(post.id) ? 'saved' : ''}" onclick="toggleSavePost('${post.id}')" aria-label="${isPostSaved(post.id) ? 'Unsave post' : 'Save post'}">🔖 <span>${isPostSaved(post.id) ? 'Saved' : 'Save'}</span></button>
+                        <button class="action-btn" onclick="toggleCommentBox('${post.id}')">💬 ${post.comments.length}</button>
+                    </div>
+
+                    <div class="comment-section" id="commentBox_${post.id}">
+                        ${commentsHtml}
+                        <div class="comment-input-box">
+                            <input type="text" id="comInput_${post.id}" placeholder="Write a comment...">
+                            <button onclick="addComment('${post.id}')">Send</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            feedBox.innerHTML += html;
+        });
+    }
+
+    function switchNavTab(tab) {
+        currentActiveTab = tab;
+        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+        
+        if (tab === 'all') document.getElementById('navFeeds').classList.add('active');
+        if (tab === 'Knowledge') document.getElementById('navKnowledge').classList.add('active');
+        if (tab === 'Q & A') document.getElementById('navQA').classList.add('active');
+        if (tab === 'Others') document.getElementById('navOthers').classList.add('active');
+        if (tab === 'saved') document.getElementById('navSaved').classList.add('active');
+
+        filterAndRenderFeed();
+    }
+
+    function toggleSearchContainer() {
+        let box = document.getElementById("searchContainer");
+        box.style.display = (box.style.display === "block") ? "none" : "block";
+    }
+
+    function setupPullToRefresh() {
+        const feedBox = document.getElementById("feedBox");
+        const pullIndicator = document.getElementById("pullIndicator");
+        let startY = 0;
+        let pullDistance = 0;
+
+        feedBox.addEventListener('touchstart', (e) => {
+            if (feedBox.scrollTop === 0) startY = e.touches[0].clientY;
+            else startY = 0;
+        }, { passive: true });
+
+        feedBox.addEventListener('touchmove', (e) => {
+            if (startY === 0) return;
+            let currentY = e.touches[0].clientY;
+            pullDistance = currentY - startY;
+
+            if (pullDistance > 0 && feedBox.scrollTop === 0) {
+                pullIndicator.style.height = Math.min(pullDistance, 50) + "px";
+                pullIndicator.innerText = pullDistance > 60 ? "လွှတ်လိုက်ပါ..." : "အောက်သို့ဆွဲပါ...";
+            }
+        }, { passive: true });
+
+        feedBox.addEventListener('touchend', async () => {
+            if (pullDistance > 60 && feedBox.scrollTop === 0) {
+                pullIndicator.innerText = "ရယူနေသည်...";
+                await loadFeed();
+            }
+            pullIndicator.style.height = "0px";
+            startY = 0;
+            pullDistance = 0;
+        });
+    }
+
+    async function toggleLike(postId) {
+        let btnText = document.querySelector(`#post_${postId} .action-btn`).innerText;
+        let isLiked = btnText.includes('❤️');
+        let countSpan = document.getElementById(`like_count_${postId}`);
+        let currentCount = parseInt(countSpan.innerText);
+
+        if (isLiked) {
+            document.querySelector(`#post_${postId} .action-btn`).innerHTML = `🤍 <span id="like_count_${postId}">${currentCount - 1}</span>`;
+        } else {
+            document.querySelector(`#post_${postId} .action-btn`).innerHTML = `❤️ <span id="like_count_${postId}">${currentCount + 1}</span>`;
+        }
+
+        await fetch(APP_SCRIPT_URL, {
+            method: "POST", mode: "no-cors",
+            body: JSON.stringify({ action: "toggleLike", postId: postId, username: currentUser })
+        });
+    }
+
+    function toggleCommentBox(postId) {
+        let box = document.getElementById(`commentBox_${postId}`);
+        box.style.display = box.style.display === "block" ? "none" : "block";
+    }
+
+    async function addComment(postId) {
+        let input = document.getElementById(`comInput_${postId}`);
+        if(!input.value.trim()) return;
+
+        let text = input.value;
+        input.value = ""; 
+
+        await fetch(APP_SCRIPT_URL, {
+            method: "POST", mode: "no-cors",
+            body: JSON.stringify({ action: "addComment", postId: postId, username: currentUser, text: text })
+        });
+        setTimeout(loadFeed, 1000); 
+    }
+
+    function selectPostCategory(cat) {
+        document.getElementById("postCategory").value = cat;
+        document.querySelectorAll(".cat-btn").forEach(btn => btn.classList.remove("selected"));
+        
+        if (cat === "Knowledge") {
+            document.getElementById("catBtn_Knowledge").classList.add("selected");
+        } else if (cat === "Q & A") {
+            document.getElementById("catBtn_QA").classList.add("selected");
+        } else {
+            document.getElementById("catBtn_Others").classList.add("selected");
+        }
+    }
+
+    async function publishPost() {
+        let category = document.getElementById("postCategory").value;
+        let text = document.getElementById("postText").value.trim();
+        let fileInput = document.getElementById("postImage");
+        let btn = document.getElementById("publishBtn");
+        
+        if(!text && fileInput.files.length === 0) return;
+
+        if (fileInput.files.length > 10) {
+            customAlert("ဓာတ်ပုံ အများဆုံး ၁၀ ပုံသာ ရွေးချယ်ခွင့်ရှိပါသည်။", "Warning");
+            return;
+        }
+        
+        btn.innerText = "Publishing...";
+        let imageUrls = [];
+
+        if (fileInput.files.length > 0) {
+            for (let i = 0; i < fileInput.files.length; i++) {
+                btn.innerText = `Uploading (${i + 1}/${fileInput.files.length})...`;
+                let formData = new FormData();
+                formData.append("image", fileInput.files[i]);
+                try {
+                    let res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, { method: "POST", body: formData });
+                    let data = await res.json();
+                    if (data.data && data.data.url) {
+                        imageUrls.push(data.data.url);
+                    }
+                } catch(e) {
+                    console.error("Upload error for file index " + i, e);
+                }
+            }
+        }
+
+        let imagePayload = imageUrls.length > 0 ? JSON.stringify(imageUrls) : "";
+        let taggedText = `[${category}] ` + text;
+
+        let payload = { action: "addPost", id: "P_" + Date.now(), text: taggedText, image: imagePayload };
+        await fetch(APP_SCRIPT_URL, { method: "POST", mode: "no-cors", body: JSON.stringify(payload) });
+        
+        document.getElementById("postText").value = "";
+        fileInput.value = "";
+        closeModals();
+        loadFeed();
+        btn.innerText = "Publish";
+    }
+
+    function openAdminAction(postId) {
+        currentActionPostId = postId;
+        openModal('actionModal');
+    }
+
+    function promptDeletePost() {
+        closeModals();
+        customConfirm("တကယ် ဖျက်မှာလားဗျာ။", async () => {
+            await fetch(APP_SCRIPT_URL, { method: "POST", mode: "no-cors", body: JSON.stringify({ action: "deletePost", id: currentActionPostId }) });
+            loadFeed();
+        });
+    }
+
+    function openEditPrompt() {
+        closeModals();
+        let targetPost = rawPostsCache.find(p => p.id === currentActionPostId);
+        if(targetPost) {
+            let parsed = parsePostCategory(targetPost.text);
+            document.getElementById("editPostText").value = parsed.text;
+        }
+        openModal('editModal');
+    }
+
+    async function submitEdit() {
+        let newText = document.getElementById("editPostText").value.trim();
+        let targetPost = rawPostsCache.find(p => p.id === currentActionPostId);
+        if(newText && targetPost) {
+            let parsed = parsePostCategory(targetPost.text);
+            let taggedText = `[${parsed.category}] ` + newText;
+            
+            await fetch(APP_SCRIPT_URL, { method: "POST", mode: "no-cors", body: JSON.stringify({ action: "editPost", id: currentActionPostId, newText: taggedText }) });
+            closeModals();
+            loadFeed();
+        }
+    }
+
+    const PRIVACY_POLICY_URL = "https://yanmoe21.github.io/EchoFeed/";
+
+    function openPrivacyPolicy() {
+        if (!PRIVACY_POLICY_URL || PRIVACY_POLICY_URL.includes("example.com")) {
+            customAlert("Privacy Policy URL ကို code ထဲမှာ သင့်ရဲ့ အမှန်တကယ် URL နဲ့ အစားထိုးပေးပါ။", "Privacy Policy");
+            return;
+        }
+        window.open(PRIVACY_POLICY_URL, "_blank", "noopener,noreferrer");
+    }
+
+    // Modal Display Functions 
+    function openModal(id) { document.getElementById(id).style.display = "flex"; }
+    function closeModals() { document.querySelectorAll('.modal').forEach(m => m.style.display = "none"); }
+
+    // Settings Page Controls
+    function openSettingsPage() {
+        document.getElementById('settingsPage').style.display = "flex";
+        isSettingsOpen = true;
+        history.pushState({ page: 'settings' }, "");
+    }
+
+    function closeSettingsPage(fromPopState = false) {
+        if (fromPopState === true) {
+            document.getElementById('settingsPage').style.display = "none";
+            isSettingsOpen = false;
+        } else {
+            history.back(); // Trigger popstate
+        }
+    }
+
+    function confirmExit() {
+        history.go(-2); // App ထွက်ရန်
+    }
+
+    function cancelExit() {
+        closeModals();
+    }
+    
+    function toggleDarkMode() { document.body.classList.toggle("dark-mode"); }
+    function changeTextSize(val) { document.documentElement.style.setProperty('--base-font-size', val + 'px'); }
+</script>
+</body>
+</html>
